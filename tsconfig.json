@@ -4,12 +4,12 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
+    "jsx": "preserve",
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
     "outDir": "dist",
-    "rootDir": "src",
-    "sourceMap": true
+    "sourceMap": true,
+    "paths": { "@/*": ["./src/*"] }
   },
-  "include": ["src"]
+  "include": ["src/**/*.ts", "src/**/*.vue"]
 }
