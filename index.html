@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trading Platform</title>
+  <link rel="stylesheet" href="/src/styles/main.css" />
+</head>
+<body>
+  <div id="app">
+    <nav id="navbar">
+      <span id="nav-title">Trading Platform</span>
+      <div id="nav-links">
+        <a href="#" data-page="dashboard">Dashboard</a>
+        <a href="#" data-page="order">Quick Order</a>
+        <a href="#" data-page="strategies">Strategies</a>
+        <a href="#" data-page="settings">Settings</a>
+      </div>
+      <span id="nav-user"></span>
+    </nav>
+    <main id="main-content"></main>
+  </div>
+  <div id="modal-overlay" class="hidden"></div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
