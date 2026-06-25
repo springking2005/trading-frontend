@@ -27,3 +27,60 @@ export function toast(msg: string) {
   document.body.appendChild(el);
   setTimeout(() => el.remove(), 3000);
 }
+
+// ── Multi-Execution Types ──
+
+export interface ExecutionInfo {
+  id: string;
+  name: string;
+  state: string;
+  strategy_template_name?: string;
+  unrealized_pnl?: number;
+  is_primary?: boolean;
+  created_at?: string;
+}
+
+export interface ExecutionPerformance {
+  execution_id: string;
+  total_invested: number;
+  current_value: number;
+  unrealized_pnl: number;
+  realized_pnl: number;
+  total_pnl: number;
+  pnl_pct: number;
+  trade_count: number;
+  win_rate?: number;
+}
+
+export interface CreateExecutionRequest {
+  stock_id: string;
+  strategy_template_id: string;
+  name?: string;
+  params?: Record<string, unknown>;
+}
+
+export interface SettingsResponse {
+  max_concurrent_stocks: number;
+  total_capital: number;
+  max_daily_loss_pct: number;
+  order_confirm_small: number;
+  order_confirm_large: number;
+  enable_auto_trading: boolean;
+  enable_multi_execution_per_stock?: boolean;
+}
+
+// ── Execution API helpers ──
+
+export const executionsApi = {
+  list: (stockId: string): Promise<ExecutionInfo[]> =>
+    api.get(`/stocks/${stockId}/executions`),
+
+  create: (body: CreateExecutionRequest): Promise<ExecutionInfo> =>
+    api.post(`/stocks/${body.stock_id}/executions`, body),
+
+  remove: (stockId: string, executionId: string): Promise<null> =>
+    api.delete(`/stocks/${stockId}/executions/${executionId}`),
+
+  performance: (executionId: string): Promise<ExecutionPerformance> =>
+    api.get(`/monitor/executions/${executionId}/performance`),
+};

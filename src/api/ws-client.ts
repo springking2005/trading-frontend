@@ -8,7 +8,7 @@ export class WsClient {
   connect(channel: string) {
     this.disconnect();
     const t = localStorage.getItem('token');
-    const url = `ws://${location.host}/api/v1/ws/${channel}?token=${t || ''}`;
+    const url = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws/${channel}?token=${t || ''}`;
     this.ws = new WebSocket(url);
     this.ws.onmessage = (e) => {
       try { const msg = JSON.parse(e.data); this.listeners.get(channel)?.forEach(fn => fn(msg)); } catch {}
