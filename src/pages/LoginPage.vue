@@ -19,42 +19,45 @@
         TraderGrid V3
       </h1>
       <p style="text-align:center;font-size:0.875rem;color:var(--tr-muted);margin-bottom:1.5rem;">
-        Intelligent trading platform
+        专业操盘手的通用策略容器
       </p>
 
       <!-- Account input -->
       <div class="input-group">
-        <label>Account</label>
+        <label>交易账户</label>
         <input
+          data-testid="login-username"
           class="input-field"
           v-model="username"
           type="text"
-          placeholder="Enter your account"
+          placeholder="输入账户名"
           @keydown.enter="submit"
         />
       </div>
 
       <!-- Password input -->
       <div class="input-group">
-        <label>Password</label>
+        <label>安全密码</label>
         <input
+          data-testid="login-password"
           class="input-field"
           v-model="password"
           type="password"
-          placeholder="Enter your password"
+          placeholder="输入密码"
           @keydown.enter="submit"
         />
       </div>
 
       <!-- Submit button -->
       <button
+        data-testid="login-submit"
         class="btn-primary"
         style="width:100%;margin-top:0.5rem;"
         :disabled="loading"
         @click="submit"
       >
-        <span v-if="loading">Loading...</span>
-        <span v-else>{{ isRegister ? 'Create Account' : 'Sign In' }}</span>
+        <span v-if="loading">加载中...</span>
+        <span v-else>{{ isRegister ? '创建账户' : '登 录' }}</span>
       </button>
 
       <!-- Register toggle -->
@@ -64,7 +67,7 @@
           @click.prevent="isRegister = !isRegister"
           style="color:var(--tr-muted);font-size:0.875rem;text-decoration:none;"
         >
-          {{ isRegister ? 'Already have an account? Sign in' : 'No account? Create one' }}
+          {{ isRegister ? '已有账户？去登录' : '没有账户？创建新账户' }}
         </a>
       </div>
 
@@ -94,7 +97,14 @@ async function submit() {
   loading.value = true;
   try {
     const endpoint = isRegister.value ? '/auth/register' : '/auth/login';
-    const data = await api.post(endpoint, { username: username.value, password: password.value });
+    const payload = isRegister.value
+      ? {
+          username: username.value,
+          password: password.value,
+          email: `${username.value.trim()}@trading.app`,
+        }
+      : { username: username.value, password: password.value };
+    const data = await api.post(endpoint, payload);
     localStorage.setItem('token', data.access_token);
     localStorage.setItem('refresh', data.refresh_token);
     router.push('/dashboard');

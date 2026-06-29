@@ -1,0 +1,318 @@
+@import './main.css';
+
+html.mobile-h5,
+html.mobile-h5 body,
+html.mobile-h5 #app {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: var(--tr-bg);
+}
+
+html.mobile-h5 body {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.mobile-h5-shell {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(30, 173, 111, 0.08), transparent 32%),
+    var(--tr-bg);
+  color: var(--tr-text);
+  overflow: hidden;
+}
+
+.mobile-h5-topbar {
+  min-height: 58px;
+  padding: calc(0.65rem + env(safe-area-inset-top)) 0.9rem 0.65rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: rgba(11, 14, 20, 0.92);
+  border-bottom: 1px solid var(--tr-border);
+  backdrop-filter: blur(18px);
+  flex-shrink: 0;
+}
+
+.mobile-h5-topbar__title {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 0.1rem;
+}
+
+.mobile-h5-topbar__title strong {
+  font-size: 1.05rem;
+  color: var(--tr-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mobile-h5-eyebrow {
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--tr-brand);
+}
+
+.mobile-h5-asset-pill {
+  border: 1px solid rgba(30, 173, 111, 0.22);
+  border-radius: 999px;
+  background: rgba(30, 173, 111, 0.08);
+  color: var(--tr-text);
+  padding: 0.35rem 0.65rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.05rem;
+  max-width: 42vw;
+}
+
+.mobile-h5-asset-pill span {
+  color: var(--tr-muted);
+  font-size: 0.64rem;
+}
+
+.mobile-h5-asset-pill strong {
+  font-size: 0.78rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.mobile-h5-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.85rem 0.75rem calc(5.6rem + env(safe-area-inset-bottom));
+}
+
+.mobile-h5-bottom-nav {
+  min-height: 64px;
+  padding: 0.35rem 0.3rem calc(0.35rem + env(safe-area-inset-bottom));
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.2rem;
+  background: rgba(21, 25, 34, 0.96);
+  border-top: 1px solid var(--tr-border);
+  backdrop-filter: blur(18px);
+  flex-shrink: 0;
+}
+
+.mobile-h5-nav-link {
+  min-width: 0;
+  border-radius: 14px;
+  color: var(--tr-muted);
+  text-decoration: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.12rem;
+  font-size: 0.68rem;
+  line-height: 1.1;
+}
+
+.mobile-h5-nav-link.active {
+  color: var(--tr-brand);
+  background: rgba(30, 173, 111, 0.1);
+}
+
+.mobile-h5-nav-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+html.mobile-h5 .page-container,
+html.mobile-h5 .trading-workbench,
+html.mobile-h5 .strategy-grid,
+html.mobile-h5 .workbench-main,
+html.mobile-h5 .workbench-side {
+  max-width: 100%;
+  min-width: 0;
+}
+
+html.mobile-h5 .card,
+html.mobile-h5 .metric-card {
+  padding: 1rem;
+  border-radius: 16px;
+  box-sizing: border-box;
+}
+
+html.mobile-h5 .metric-card .value {
+  font-size: 1.08rem;
+}
+
+html.mobile-h5 .metrics-grid,
+html.mobile-h5 .asset-breakdown {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+html.mobile-h5 .two-col,
+html.mobile-h5 .order-layout,
+html.mobile-h5 .workbench-layout,
+html.mobile-h5 .strategy-grid,
+html.mobile-h5 .preset-order-layout,
+html.mobile-h5 .grid-2,
+html.mobile-h5 .grid-3,
+html.mobile-h5 .summary-grid,
+html.mobile-h5 .asset-grid,
+html.mobile-h5 .query-grid,
+html.mobile-h5 .p2-grid {
+  grid-template-columns: 1fr !important;
+}
+
+html.mobile-h5 .workbench-header,
+html.mobile-h5 .asset-workbench__header,
+html.mobile-h5 .settings-readme,
+html.mobile-h5 .preset-orders-panel__header,
+html.mobile-h5 .setting-toggle-row,
+html.mobile-h5 .tl-row-header {
+  flex-direction: column;
+  align-items: stretch !important;
+}
+
+html.mobile-h5 .workbench-header__context,
+html.mobile-h5 .context-actions,
+html.mobile-h5 .action-footer,
+html.mobile-h5 .quick-actions {
+  width: 100%;
+  flex-direction: column;
+  align-items: stretch !important;
+}
+
+html.mobile-h5 .context-chip,
+html.mobile-h5 .context-chip--search {
+  min-width: 0 !important;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+html.mobile-h5 .tab-card {
+  position: sticky;
+  top: -0.85rem;
+  z-index: 30;
+  margin-left: -0.75rem;
+  margin-right: -0.75rem;
+  border-left: 0;
+  border-right: 0;
+  border-radius: 0;
+  background: rgba(11, 14, 20, 0.95);
+  backdrop-filter: blur(16px);
+}
+
+html.mobile-h5 .tab-bar {
+  display: flex !important;
+  grid-template-columns: none !important;
+  gap: 0.45rem;
+  overflow-x: auto;
+  padding-bottom: 0.1rem;
+  scrollbar-width: none;
+}
+
+html.mobile-h5 .tab-bar::-webkit-scrollbar {
+  display: none;
+}
+
+html.mobile-h5 .tab-btn {
+  flex: 0 0 auto;
+  min-width: 4.6rem;
+  min-height: 2.5rem;
+}
+
+html.mobile-h5 .table-head {
+  display: none !important;
+}
+
+html.mobile-h5 .table-row {
+  grid-template-columns: 1fr !important;
+  gap: 0.35rem;
+}
+
+html.mobile-h5 .modal-overlay,
+html.mobile-h5 .modal {
+  align-items: flex-end;
+  padding: 0;
+}
+
+html.mobile-h5 .modal-content {
+  width: 100%;
+  max-width: none !important;
+  max-height: 86dvh;
+  border-radius: 22px 22px 0 0;
+  padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+
+html.mobile-h5 .modal-actions {
+  flex-direction: column-reverse;
+}
+
+html.mobile-h5 .btn,
+html.mobile-h5 .btn-primary,
+html.mobile-h5 .btn-secondary,
+html.mobile-h5 .btn-outline,
+html.mobile-h5 .btn-danger,
+html.mobile-h5 .input-field,
+html.mobile-h5 .select-field {
+  min-height: 42px;
+}
+
+html.mobile-h5 .search-dropdown {
+  position: fixed;
+  left: 0.75rem;
+  right: 0.75rem;
+  top: auto;
+  max-height: 48dvh;
+  overflow-y: auto;
+}
+
+html.mobile-h5 .quote-summary,
+html.mobile-h5 .position-card,
+html.mobile-h5 .security-banner,
+html.mobile-h5 .preset-record-card__head,
+html.mobile-h5 .preset-record-card__foot {
+  align-items: flex-start !important;
+  flex-direction: column;
+}
+
+html.mobile-h5 .toast {
+  left: 0.75rem;
+  right: 0.75rem;
+  top: auto;
+  bottom: calc(5rem + env(safe-area-inset-bottom));
+  transform: none;
+  text-align: center;
+}
+
+html.mobile-h5 .desktop-only,
+html.mobile-h5 .sidebar,
+html.mobile-h5 .top-header,
+html.mobile-h5 .bottom-nav {
+  display: none !important;
+}
+
+html.mobile-h5 .mobile-only {
+  display: block !important;
+}
+
+@media (max-width: 380px) {
+  html.mobile-h5 .metrics-grid,
+  html.mobile-h5 .asset-breakdown {
+    grid-template-columns: 1fr;
+  }
+
+  .mobile-h5-asset-pill {
+    display: none;
+  }
+}

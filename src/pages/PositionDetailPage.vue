@@ -20,6 +20,7 @@
             :key="f.key"
             class="btn btn-sm"
             :class="lotFilter === f.key ? 'btn-primary' : 'btn-outline'"
+            :data-testid="'tl-filter-' + f.key"
             @click="lotFilter = f.key"
           >
             {{ f.label }}
@@ -37,17 +38,17 @@
       </div>
 
       <!-- Loading -->
-      <div v-if="tlLoading" class="card" style="text-align:center;padding:2rem;color:var(--tr-muted)">Loading positions...</div>
+      <div v-if="tlLoading" class="card" style="text-align:center;padding:2rem;color:var(--tr-muted)">加载中...</div>
 
       <!-- Error -->
       <div v-else-if="tlError" class="card" style="text-align:center;padding:2rem">
         <div style="color:var(--tr-up);margin-bottom:0.75rem">{{ tlError }}</div>
-        <button class="btn btn-primary" @click="loadTradeLotPositions">Retry</button>
+        <button class="btn btn-primary" @click="loadTradeLotPositions">重试</button>
       </div>
 
       <!-- Empty -->
       <div v-else-if="filteredTlPositions.length === 0" class="card" style="text-align:center;padding:2rem;color:var(--tr-muted)">
-        {{ lotFilter === 'all' ? 'No positions' : 'No matching positions' }}
+        {{ lotFilter === 'all' ? '暂无持仓' : '暂无匹配持仓' }}
       </div>
 
       <!-- Position Cards -->
@@ -57,6 +58,7 @@
           :key="p.id"
           class="card tl-position-card"
           :class="{ 'tl-expanded': tlExpandedIds.has(p.id) }"
+          data-testid="tl-position-card"
         >
           <!-- Collapsed Row -->
           <div
@@ -81,7 +83,7 @@
             </div>
             <div style="flex:1.5;text-align:right">
               <span class="badge" style="background:rgba(30,173,111,0.1);color:var(--tr-brand);border:1px solid rgba(30,173,111,0.2)">
-                {{ p.strategy_name || p.status || 'ACTIVE' }}
+                {{ p.strategy_name || p.status || '活跃' }}
               </span>
               <!-- Capacity Bar -->
               <div class="progress-bar" style="margin-top:0.375rem">
@@ -104,15 +106,15 @@
             <div class="tl-lots-header">
               <span style="font-weight:600;font-size:0.875rem;color:var(--tr-text)">执行批次明细 (TradeLots)</span>
               <div style="display:flex;gap:0.375rem">
-                <button class="btn btn-sm btn-outline" @click.stop="openTuneParams(p)">参数调优</button>
-                <button class="btn btn-sm btn-outline" @click.stop="pauseStrategy(p)">暂停策略</button>
-                <button class="btn btn-sm btn-danger" @click.stop="clearStock(p)">一键清仓</button>
+                <button class="btn btn-sm btn-outline" data-testid="tl-tune-params-btn" @click.stop="openTuneParams(p)">参数调优</button>
+                <button class="btn btn-sm btn-outline" data-testid="tl-pause-strategy-btn" @click.stop="pauseStrategy(p)">暂停策略</button>
+                <button class="btn btn-sm btn-danger" data-testid="tl-clear-stock-btn" @click.stop="clearTradeLotPosition(p)">一键清仓</button>
               </div>
             </div>
 
             <!-- TradeLots Content -->
-            <div v-if="tlLotsLoading[p.id]" style="text-align:center;padding:1rem;color:var(--tr-muted)">Loading lots...</div>
-            <div v-else-if="!tlLots[p.id]?.length" style="text-align:center;padding:1rem;color:var(--tr-muted)">No trade lots</div>
+            <div v-if="tlLotsLoading[p.id]" style="text-align:center;padding:1rem;color:var(--tr-muted)">加载中...</div>
+            <div v-else-if="!tlLots[p.id]?.length" style="text-align:center;padding:1rem;color:var(--tr-muted)">暂无批次</div>
             <template v-else>
               <div v-for="(lot, i) in tlLots[p.id]" :key="lot.id || i">
                 <!-- Base lot -->
@@ -128,7 +130,7 @@
                   </div>
                   <div style="display:flex;align-items:center;gap:1rem">
                     <span v-if="lot.pnl != null" :class="lot.pnl >= 0 ? 'text-down' : 'text-up'" style="font-size:0.8125rem">
-                      P&amp;L: {{ lot.pnl >= 0 ? '+' : '' }}&yen;{{ Math.abs(lot.pnl).toLocaleString() }}
+                      盈亏: {{ lot.pnl >= 0 ? '+' : '' }}&yen;{{ Math.abs(lot.pnl).toLocaleString() }}
                     </span>
                     <span v-if="lot.hard_stop_price" style="font-size:0.75rem;color:var(--tr-up)">硬止损 &yen;{{ formatNum(lot.hard_stop_price) }}</span>
                   </div>
@@ -156,7 +158,7 @@
                     </div>
                   </div>
                   <div style="margin-top:0.25rem">
-                    <span class="badge" :class="lotStatusBadge(lot.status)">{{ lot.status || 'HOLDING' }}</span>
+                    <span class="badge" :class="lotStatusBadge(lot.status)">{{ lot.status || '持仓中' }}</span>
                   </div>
                 </div>
               </div>
@@ -181,36 +183,36 @@
       <div v-if="tlTuneModal.show" class="modal-overlay" @click.self="tlTuneModal.show = false">
         <div class="modal-content">
           <div class="modal-header">参数调优 — {{ tlTuneModal.stock?.stock_name || tlTuneModal.stock?.vt_symbol }}</div>
-          <div v-if="tlTuneModal.loading" style="text-align:center;padding:1rem;color:var(--tr-muted)">Loading params...</div>
+          <div v-if="tlTuneModal.loading" style="text-align:center;padding:1rem;color:var(--tr-muted)">加载中...</div>
           <template v-else>
             <div class="input-group">
-              <label>Base Amount (&yen;)</label>
+              <label>底仓金额 (&yen;)</label>
               <input class="input-field" v-model.number="tlTuneForm.base_position_amount" type="number" step="10000" />
             </div>
             <div class="input-group">
-              <label>Add Amount (&yen;)</label>
+              <label>补仓金额 (&yen;)</label>
               <input class="input-field" v-model.number="tlTuneForm.add_position_amount" type="number" step="10000" />
             </div>
             <div class="input-group">
-              <label>Add Trigger (%)</label>
+              <label>补仓触发 (%)</label>
               <input class="input-field" v-model.number="tlTuneForm.add_trigger_pct" type="number" step="0.1" />
             </div>
             <div class="input-group">
-              <label>Sell Trigger (%)</label>
+              <label>止盈触发 (%)</label>
               <input class="input-field" v-model.number="tlTuneForm.sell_trigger_pct" type="number" step="0.1" />
             </div>
             <div class="input-group">
-              <label>Max Add Count</label>
+              <label>最大补仓次数</label>
               <input class="input-field" v-model.number="tlTuneForm.max_add_count" type="number" min="1" max="20" />
             </div>
             <div class="input-group">
-              <label>Hard Stop Loss (%)</label>
+              <label>硬止损 (%)</label>
               <input class="input-field" v-model.number="tlTuneForm.hard_stop_loss_pct" type="number" step="0.1" />
             </div>
             <div class="modal-actions">
-              <button class="btn btn-outline" @click="tlTuneModal.show = false">Cancel</button>
+              <button class="btn btn-outline" @click="tlTuneModal.show = false">取消</button>
               <button class="btn btn-primary" :disabled="tlTuneModal.saving" @click="saveTuneParams">
-                {{ tlTuneModal.saving ? 'Saving...' : 'Save' }}
+                {{ tlTuneModal.saving ? '保存中...' : '保存' }}
               </button>
             </div>
           </template>
@@ -222,25 +224,25 @@
         <div class="modal-content">
           <div class="modal-header">添加策略执行</div>
           <div style="font-size:0.8125rem;color:var(--tr-muted);margin-bottom:0.75rem">
-            Stock: {{ tlAddExecModal.stock?.stock_name || tlAddExecModal.stock?.vt_symbol }}
+            标的：{{ tlAddExecModal.stock?.stock_name || tlAddExecModal.stock?.vt_symbol }}
           </div>
           <div class="input-group">
-            <label>Strategy Template</label>
+            <label>策略模板</label>
             <select class="input-field" v-model="tlAddExecForm.templateId">
-              <option value="">Select template...</option>
+              <option value="">选择模板...</option>
               <option v-for="t in tlAddExecModal.templates" :key="t.id" :value="t.id">
-                {{ t.name }}{{ t.is_system ? ' (System)' : '' }}
+                {{ t.name }}{{ t.is_system ? ' (系统)' : '' }}
               </option>
             </select>
           </div>
           <div class="input-group">
-            <label>Execution Name (optional)</label>
-            <input class="input-field" v-model="tlAddExecForm.name" type="text" placeholder="e.g. Tail Grid #2" />
+            <label>执行名称 (可选)</label>
+            <input class="input-field" v-model="tlAddExecForm.name" type="text" placeholder="例如：尾盘网格 #2" />
           </div>
           <div class="modal-actions">
-            <button class="btn btn-outline" @click="tlAddExecModal.show = false">Cancel</button>
+            <button class="btn btn-outline" @click="tlAddExecModal.show = false">取消</button>
             <button class="btn btn-primary" :disabled="!tlAddExecForm.templateId || tlAddExecModal.saving" @click="addExecForTradeLot">
-              {{ tlAddExecModal.saving ? 'Adding...' : 'Add Execution' }}
+              {{ tlAddExecModal.saving ? '添加中...' : '添加策略' }}
             </button>
           </div>
         </div>
@@ -253,13 +255,13 @@
     <template v-else>
       <!-- Loading -->
       <div v-if="loading" class="card" style="text-align:center;padding:2rem;color:var(--tr-muted)">
-        Loading position...
+        加载中...
       </div>
 
       <!-- Error -->
       <div v-else-if="error" class="card" style="text-align:center;padding:2rem">
         <div style="color:var(--tr-up);margin-bottom:0.75rem">{{ error }}</div>
-        <button class="btn btn-primary" @click="$router.back()">Go Back</button>
+        <button class="btn btn-primary" @click="$router.back()">返回</button>
       </div>
 
       <template v-else-if="position">
@@ -277,14 +279,48 @@
             <div style="text-align:right">
               <div class="text-xl">&yen;{{ (position.current_value || 0).toLocaleString() }}</div>
               <div :class="(position.unrealized_pnl || 0) >= 0 ? 'text-down' : 'text-up'">
-                P&amp;L: &yen;{{ (position.unrealized_pnl || 0).toLocaleString() }}
+                盈亏: &yen;{{ (position.unrealized_pnl || 0).toLocaleString() }}
               </div>
             </div>
           </div>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.75rem">
+            <button class="btn btn-sm btn-primary" data-testid="position-buy-add-btn" @click="goToTradeWorkbench('buy')">买入 / 加仓</button>
+            <button class="btn btn-sm btn-outline" data-testid="position-sell-reduce-btn" @click="goToTradeWorkbench('sell')">卖出 / 减仓</button>
+            <button class="btn btn-sm btn-danger" data-testid="position-clear-btn" @click="openClearConfirm">一键清仓</button>
+            <button class="btn btn-sm btn-outline" data-testid="position-bind-btn" @click="openTakeoverModal('bind')">绑定策略</button>
+            <button
+              class="btn btn-sm btn-outline"
+              data-testid="position-unbind-btn"
+              :disabled="!selectedExecutionId && !position.strategy_instance_id"
+              @click="openTakeoverModal('unbind')"
+            >
+              解绑策略
+            </button>
+            <button
+              v-if="position.status?.toLowerCase() !== 'paused'"
+              class="btn btn-sm btn-outline"
+              data-testid="position-pause-btn"
+              @click="pauseCurrentStrategy"
+            >
+              暂停
+            </button>
+            <button
+              v-else
+              class="btn btn-sm btn-outline"
+              data-testid="position-resume-btn"
+              @click="resumeCurrentStrategy"
+            >
+              恢复
+            </button>
+          </div>
+          <div style="margin-top:0.75rem;padding:0.75rem;border:1px solid rgba(30,173,111,0.18);border-radius:var(--tr-radius-sm);background:rgba(30,173,111,0.04);color:var(--tr-text);font-size:0.875rem;line-height:1.6">
+            <strong>接管说明：</strong>已有持仓接管不改写历史成交，只影响后续执行归属。
+            绑定策略后，系统会把后续自动加仓、自动卖出和硬止损归入新的策略执行；普通买卖路径仍然可见，可继续走交易工作台。
+          </div>
           <div style="display:flex;gap:1rem;margin-top:0.75rem;font-size:0.8125rem;color:var(--tr-muted)">
-            <span>Initial: &yen;{{ formatNum(position.initial_price) }}</span>
-            <span>Current: &yen;{{ formatNum(position.current_price) }}</span>
-            <span>Last Entry: &yen;{{ formatNum(position.last_entry_price) }}</span>
+            <span>初始价格：&yen;{{ formatNum(position.initial_price) }}</span>
+            <span>现价：&yen;{{ formatNum(position.current_price) }}</span>
+            <span>最近入场：&yen;{{ formatNum(position.last_entry_price) }}</span>
           </div>
         </div>
 
@@ -304,75 +340,78 @@
         <!-- Strategy Parameters -->
         <div class="card">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
-            <span style="font-weight:600;color:var(--tr-text)">{{ enableMultiExecution ? 'Execution Parameters' : 'Strategy Parameters' }}</span>
-            <button v-if="!editingParams" class="btn btn-sm btn-outline" @click="startEditParams">Edit</button>
+            <span style="font-weight:600;color:var(--tr-text)">{{ enableMultiExecution ? '策略执行参数' : '策略参数' }}</span>
+            <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+              <button v-if="!editingParams" class="btn btn-sm btn-outline" data-testid="position-tune-entry-btn" @click="startEditParams">参数调优</button>
+              <button v-if="!editingParams" class="btn btn-sm btn-outline" data-testid="position-bind-entry-btn" @click="openTakeoverModal('bind')">模板选择</button>
+            </div>
           </div>
 
           <!-- View Mode -->
           <div v-if="!editingParams">
             <div class="param-group">
-              <div class="param-group-label">Entry</div>
+              <div class="param-group-label">建仓参数</div>
               <div class="grid-2">
                 <div class="param-item">
-                  <span class="text-secondary">Base Amount</span>
+                  <span class="text-secondary">底仓金额</span>
                   <span style="color:var(--tr-text)">&yen;{{ currentParams.base_position_amount?.toLocaleString() || '--' }}</span>
                 </div>
                 <div class="param-item">
-                  <span class="text-secondary">Add Amount</span>
+                  <span class="text-secondary">补仓金额</span>
                   <span style="color:var(--tr-text)">&yen;{{ currentParams.add_position_amount?.toLocaleString() || '--' }}</span>
                 </div>
               </div>
             </div>
             <div class="param-group">
-              <div class="param-group-label">Position</div>
+              <div class="param-group-label">仓位参数</div>
               <div class="grid-2">
                 <div class="param-item">
-                  <span class="text-secondary">Max Add Count</span>
+                  <span class="text-secondary">最大补仓次数</span>
                   <span style="color:var(--tr-text)">{{ currentParams.max_add_count ?? '--' }}</span>
                 </div>
                 <div class="param-item">
-                  <span class="text-secondary">Max Position Amount</span>
+                  <span class="text-secondary">单票容量上限</span>
                   <span style="color:var(--tr-text)">&yen;{{ currentParams.max_position_amount?.toLocaleString() || '--' }}</span>
                 </div>
               </div>
             </div>
             <div class="param-group">
-              <div class="param-group-label">Exit</div>
+              <div class="param-group-label">离场参数</div>
               <div class="grid-2">
                 <div class="param-item">
-                  <span class="text-secondary">Add Trigger</span>
+                  <span class="text-secondary">补仓触发</span>
                   <span class="text-down">{{ currentParams.add_trigger_pct ?? '--' }}%</span>
                 </div>
                 <div class="param-item">
-                  <span class="text-secondary">Sell Trigger</span>
+                  <span class="text-secondary">止盈触发</span>
                   <span class="text-up">{{ currentParams.sell_trigger_pct ?? '--' }}%</span>
                 </div>
               </div>
             </div>
             <div class="param-group">
-              <div class="param-group-label">Risk</div>
+              <div class="param-group-label">风控</div>
               <div class="grid-2">
                 <div class="param-item">
-                  <span class="text-secondary">Hard Stop Loss</span>
+                  <span class="text-secondary">硬止损</span>
                   <span class="text-up">{{ currentParams.hard_stop_loss_pct ?? '--' }}%</span>
                 </div>
                 <div class="param-item">
-                  <span class="text-secondary">Price Type</span>
-                  <span style="color:var(--tr-text)">{{ currentParams.add_price_type || 'market' }} / {{ currentParams.sell_price_type || 'market' }}</span>
+                  <span class="text-secondary">价格类型</span>
+                  <span style="color:var(--tr-text)">{{ currentParams.add_price_type || '市价' }} / {{ currentParams.sell_price_type || '市价' }}</span>
                 </div>
               </div>
             </div>
             <div class="param-group">
-              <div class="param-group-label">Flags</div>
+              <div class="param-group-label">开关</div>
               <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
                 <span class="badge" :class="currentParams.enable_auto_add ? 'badge-active' : 'badge-stopped'">
-                  Auto Add: {{ currentParams.enable_auto_add ? 'ON' : 'OFF' }}
+                  自动补仓: {{ currentParams.enable_auto_add ? '开' : '关' }}
                 </span>
                 <span class="badge" :class="currentParams.enable_auto_sell ? 'badge-active' : 'badge-stopped'">
-                  Auto Sell: {{ currentParams.enable_auto_sell ? 'ON' : 'OFF' }}
+                  自动止盈: {{ currentParams.enable_auto_sell ? '开' : '关' }}
                 </span>
                 <span class="badge" :class="currentParams.enable_hard_stop ? 'badge-active' : 'badge-stopped'">
-                  Hard Stop: {{ currentParams.enable_hard_stop ? 'ON' : 'OFF' }}
+                  硬止损: {{ currentParams.enable_hard_stop ? '开' : '关' }}
                 </span>
               </div>
             </div>
@@ -381,82 +420,88 @@
           <!-- Edit Mode -->
           <div v-else>
             <div class="param-group">
-              <div class="param-group-label">Entry</div>
+              <div class="param-group-label">建仓参数</div>
               <div class="row">
                 <div class="input-group" style="flex:1">
-                  <label>Base Amount (&yen;)</label>
+                  <label>底仓金额 (&yen;)</label>
                   <input class="input-field" v-model.number="editForm.base_position_amount" type="number" step="10000" />
                 </div>
                 <div class="input-group" style="flex:1">
-                  <label>Add Amount (&yen;)</label>
+                  <label>补仓金额 (&yen;)</label>
                   <input class="input-field" v-model.number="editForm.add_position_amount" type="number" step="10000" />
                 </div>
               </div>
             </div>
             <div class="param-group">
-              <div class="param-group-label">Position</div>
+              <div class="param-group-label">仓位参数</div>
               <div class="row">
                 <div class="input-group" style="flex:1">
-                  <label>Max Add Count</label>
+                  <label>最大补仓次数</label>
                   <input class="input-field" v-model.number="editForm.max_add_count" type="number" min="1" max="20" />
                 </div>
                 <div class="input-group" style="flex:1">
-                  <label>Max Position Amount (&yen;)</label>
+                  <label>单票容量上限 (&yen;)</label>
                   <input class="input-field" v-model.number="editForm.max_position_amount" type="number" step="10000" />
                 </div>
               </div>
             </div>
             <div class="param-group">
-              <div class="param-group-label">Exit</div>
+              <div class="param-group-label">离场参数</div>
               <div class="row">
                 <div class="input-group" style="flex:1">
-                  <label>Add Trigger (%)</label>
+                  <label>补仓触发 (%)</label>
                   <input class="input-field" v-model.number="editForm.add_trigger_pct" type="number" step="0.1" />
                 </div>
                 <div class="input-group" style="flex:1">
-                  <label>Sell Trigger (%)</label>
+                  <label>止盈触发 (%)</label>
                   <input class="input-field" v-model.number="editForm.sell_trigger_pct" type="number" step="0.1" />
                 </div>
               </div>
             </div>
             <div class="param-group">
-              <div class="param-group-label">Risk</div>
+              <div class="param-group-label">风控</div>
               <div class="row">
                 <div class="input-group" style="flex:1">
-                  <label>Hard Stop Loss (%)</label>
+                  <label>硬止损 (%)</label>
                   <input class="input-field" v-model.number="editForm.hard_stop_loss_pct" type="number" step="0.1" />
                 </div>
               </div>
             </div>
             <div class="param-group">
-              <div class="param-group-label">Flags</div>
+              <div class="param-group-label">开关</div>
               <div style="display:flex;flex-direction:column;gap:0.5rem">
                 <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;color:var(--tr-text)">
-                  Auto Add <span class="toggle" :class="{ active: editForm.enable_auto_add }" @click="editForm.enable_auto_add = !editForm.enable_auto_add"></span>
+                  自动补仓 <span class="toggle" :class="{ active: editForm.enable_auto_add }" @click="editForm.enable_auto_add = !editForm.enable_auto_add"></span>
                 </label>
                 <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;color:var(--tr-text)">
-                  Auto Sell <span class="toggle" :class="{ active: editForm.enable_auto_sell }" @click="editForm.enable_auto_sell = !editForm.enable_auto_sell"></span>
+                  自动止盈 <span class="toggle" :class="{ active: editForm.enable_auto_sell }" @click="editForm.enable_auto_sell = !editForm.enable_auto_sell"></span>
                 </label>
                 <label style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;color:var(--tr-text)">
-                  Hard Stop <span class="toggle" :class="{ active: editForm.enable_hard_stop }" @click="editForm.enable_hard_stop = !editForm.enable_hard_stop"></span>
+                  硬止损 <span class="toggle" :class="{ active: editForm.enable_hard_stop }" @click="editForm.enable_hard_stop = !editForm.enable_hard_stop"></span>
                 </label>
               </div>
             </div>
             <div style="display:flex;gap:0.5rem;margin-top:1rem">
               <button class="btn btn-primary" :disabled="savingParams" @click="saveParams">
-                {{ savingParams ? 'Saving...' : 'Save Parameters' }}
+                {{ savingParams ? '保存中...' : '保存参数' }}
               </button>
-              <button class="btn btn-outline" @click="cancelEditParams">Cancel</button>
+              <button class="btn btn-outline" @click="cancelEditParams">取消</button>
             </div>
           </div>
         </div>
 
         <!-- TradeLots -->
         <div class="card">
-          <div style="font-weight:600;margin-bottom:0.75rem;color:var(--tr-text)">Trade Lots</div>
-          <div v-if="lotsLoading" style="text-align:center;padding:1rem;color:var(--tr-muted)">Loading lots...</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;gap:0.75rem;flex-wrap:wrap">
+            <div>
+              <div style="font-weight:600;color:var(--tr-text)">TradeLot / 执行批次</div>
+              <div style="font-size:0.8125rem;color:var(--tr-muted)">展示当前持仓的批次、出场状态和每笔执行归属</div>
+            </div>
+            <button class="btn btn-sm btn-outline" data-testid="position-refresh-btn" @click="refreshDetail">刷新</button>
+          </div>
+          <div v-if="lotsLoading" style="text-align:center;padding:1rem;color:var(--tr-muted)">加载中...</div>
           <div v-else-if="tradeLots.length === 0" style="text-align:center;padding:1rem;color:var(--tr-muted)">
-            No trade lots
+            暂无批次
           </div>
           <div v-else>
             <div style="display:flex;gap:0.25rem;margin-bottom:0.5rem;flex-wrap:wrap">
@@ -477,18 +522,18 @@
                   <span class="badge" :class="lotStatusBadge(lot.status)" style="margin-left:0.375rem">
                     {{ lot.status }}
                   </span>
-                  <span v-if="lot.locked" class="badge badge-stopped" style="margin-left:0.25rem">Locked</span>
+                  <span v-if="lot.locked" class="badge badge-stopped" style="margin-left:0.25rem">已锁定</span>
                 </div>
                 <div style="text-align:right">
                   <div style="color:var(--tr-text)">&yen;{{ formatNum(lot.entry_price) }}</div>
-                  <div class="text-secondary">{{ lot.entry_volume || 0 }} sh</div>
+                  <div class="text-secondary">{{ lot.entry_volume || 0 }} 股</div>
                 </div>
               </div>
               <div style="display:flex;justify-content:space-between;margin-top:0.25rem;font-size:0.75rem">
-                <span class="text-secondary">Entry: {{ formatDate(lot.entry_time) }}</span>
-                <span v-if="lot.exit_price" class="text-secondary">Exit: &yen;{{ formatNum(lot.exit_price) }}</span>
+                <span class="text-secondary">入场：{{ formatDate(lot.entry_time) }}</span>
+                <span v-if="lot.exit_price" class="text-secondary">出场：&yen;{{ formatNum(lot.exit_price) }}</span>
                 <span v-if="lot.pnl != null" :class="lot.pnl >= 0 ? 'text-down' : 'text-up'">
-                  P&amp;L: &yen;{{ lot.pnl.toLocaleString() }}
+                  盈亏: &yen;{{ lot.pnl.toLocaleString() }}
                 </span>
               </div>
             </div>
@@ -497,47 +542,47 @@
 
         <!-- P&L Summary -->
         <div v-if="tradeLots.length > 0" class="card">
-          <div style="font-weight:600;margin-bottom:0.75rem;color:var(--tr-text)">P&amp;L Summary</div>
+          <div style="font-weight:600;margin-bottom:0.75rem;color:var(--tr-text)">盈亏汇总</div>
           <div class="grid-2">
             <div style="text-align:center">
               <div class="text-lg" :class="pnlSummary.total >= 0 ? 'text-down' : 'text-up'">
                 &yen;{{ pnlSummary.total.toLocaleString() }}
               </div>
-              <div class="text-secondary">Total P&amp;L</div>
+              <div class="text-secondary">总盈亏</div>
             </div>
             <div style="text-align:center">
               <div class="text-lg" style="color:var(--tr-text)">{{ pnlSummary.soldCount }} / {{ pnlSummary.totalCount }}</div>
-              <div class="text-secondary">Sold / Total Lots</div>
+              <div class="text-secondary">已卖出 / 总批次</div>
             </div>
           </div>
         </div>
 
         <!-- Per-Execution Performance -->
         <div v-if="enableMultiExecution && execPerformance" class="card">
-          <div style="font-weight:600;margin-bottom:0.75rem;color:var(--tr-text)">Execution Performance</div>
-          <div v-if="execPerfLoading" style="text-align:center;padding:0.75rem;color:var(--tr-muted)">Loading performance...</div>
+          <div style="font-weight:600;margin-bottom:0.75rem;color:var(--tr-text)">策略执行表现</div>
+          <div v-if="execPerfLoading" style="text-align:center;padding:0.75rem;color:var(--tr-muted)">加载中...</div>
           <div v-else-if="execPerfError" style="text-align:center;padding:0.5rem;color:var(--tr-up);font-size:0.8125rem">{{ execPerfError }}</div>
           <div v-else>
             <div class="grid-3" style="margin-bottom:0.75rem">
               <div style="text-align:center">
                 <div style="font-size:1.125rem;font-weight:700;color:var(--tr-text)">&yen;{{ (execPerformance.total_invested || 0).toLocaleString() }}</div>
-                <div class="text-secondary">Invested</div>
+                <div class="text-secondary">已投入</div>
               </div>
               <div style="text-align:center">
                 <div style="font-size:1.125rem;font-weight:700;color:var(--tr-text)">&yen;{{ (execPerformance.current_value || 0).toLocaleString() }}</div>
-                <div class="text-secondary">Current Value</div>
+                <div class="text-secondary">当前市值</div>
               </div>
               <div style="text-align:center">
                 <div style="font-size:1.125rem;font-weight:700" :class="execPerformance.total_pnl >= 0 ? 'text-down' : 'text-up'">
                   &yen;{{ (execPerformance.total_pnl || 0).toLocaleString() }}
                 </div>
-                <div class="text-secondary">Total P&amp;L</div>
+                <div class="text-secondary">总盈亏</div>
               </div>
             </div>
             <div style="display:flex;justify-content:space-between;font-size:0.8125rem;color:var(--tr-muted)">
-              <span>Trades: {{ execPerformance.trade_count ?? 0 }}</span>
-              <span v-if="execPerformance.win_rate != null">Win Rate: {{ (execPerformance.win_rate * 100).toFixed(1) }}%</span>
-              <span>Realized: &yen;{{ (execPerformance.realized_pnl || 0).toLocaleString() }}</span>
+              <span>交易次数：{{ execPerformance.trade_count ?? 0 }}</span>
+              <span v-if="execPerformance.win_rate != null">胜率：{{ (execPerformance.win_rate * 100).toFixed(1) }}%</span>
+              <span>已实现：&yen;{{ (execPerformance.realized_pnl || 0).toLocaleString() }}</span>
             </div>
           </div>
         </div>
@@ -547,29 +592,140 @@
           <div class="modal-content">
             <div class="modal-header">添加策略执行</div>
             <div style="font-size:0.8125rem;color:var(--tr-muted);margin-bottom:0.75rem">
-              Stock: {{ position.vt_symbol }}
+              标的：{{ position.vt_symbol }}
             </div>
             <div class="input-group">
-              <label>Strategy Template</label>
+              <label>策略模板</label>
               <select class="input-field" v-model="addExecInDetailTemplateId">
-                <option value="">Select template...</option>
+                <option value="">选择模板...</option>
                 <option v-for="t in addExecInDetailTemplates" :key="t.id" :value="t.id">
-                  {{ t.name }}{{ t.is_system ? ' (System)' : '' }}
+                  {{ t.name }}{{ t.is_system ? ' (系统)' : '' }}
                 </option>
               </select>
             </div>
             <div class="input-group">
-              <label>Execution Name (optional)</label>
-              <input class="input-field" v-model="addExecInDetailName" type="text" placeholder="e.g. Tail Grid #2" />
+              <label>执行名称 (可选)</label>
+              <input class="input-field" v-model="addExecInDetailName" type="text" placeholder="例如：尾盘网格 #2" />
             </div>
             <div class="modal-actions">
-              <button class="btn btn-outline" @click="closeAddExecInDetail">Cancel</button>
+              <button class="btn btn-outline" @click="closeAddExecInDetail">取消</button>
               <button
                 class="btn btn-primary"
                 :disabled="!addExecInDetailTemplateId || addingExecInDetail"
                 @click="addExecInDetail"
               >
-                {{ addingExecInDetail ? 'Adding...' : 'Add Execution' }}
+                {{ addingExecInDetail ? '添加中...' : '添加策略' }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Strategy Takeover Modal -->
+        <div v-if="showTakeoverModal" class="modal-overlay" @click.self="closeTakeoverModal">
+          <div class="modal-content" style="max-width:560px">
+            <div class="modal-header">{{ takeoverMode === 'unbind' ? '解绑策略' : '策略接管' }}</div>
+            <div style="font-size:0.875rem;color:var(--tr-muted);margin-bottom:0.75rem;line-height:1.6">
+              <template v-if="takeoverMode === 'unbind'">
+                解绑后仅停止该持仓后续自动执行，不会删除或改写历史成交。
+              </template>
+              <template v-else>
+                绑定策略会接管后续执行归属，不改写历史成交；普通交易路径仍然保留可见。
+              </template>
+            </div>
+            <template v-if="takeoverMode !== 'unbind'">
+              <div v-if="takeoverTemplates.length === 0" class="card" style="padding:0.75rem;margin-bottom:0.75rem;text-align:center;color:var(--tr-muted);background:rgba(255,255,255,0.02)">
+                策略模板加载中或暂无模板；仍可先保留普通交易路径。
+              </div>
+              <div class="input-group">
+                <label>策略模板</label>
+                <select class="input-field" v-model="takeoverForm.templateId">
+                  <option value="">选择模板...</option>
+                  <option v-for="t in takeoverTemplates" :key="t.id" :value="t.id">
+                    {{ t.name }}{{ t.is_system ? ' (系统)' : '' }}
+                  </option>
+                </select>
+              </div>
+              <div class="input-group">
+                <label>基准价策略</label>
+                <select class="select-field" v-model="takeoverForm.basePriceStrategy">
+                  <option value="current">当前价</option>
+                  <option value="avg_cost">持仓成本价</option>
+                  <option value="last_entry">最近入场价</option>
+                  <option value="prev_close">昨收价</option>
+                </select>
+              </div>
+              <div class="grid-2">
+                <label class="param-switch">
+                  <span>自动加仓</span>
+                  <span class="toggle" :class="{ active: takeoverForm.enableAutoAdd }" @click="takeoverForm.enableAutoAdd = !takeoverForm.enableAutoAdd"></span>
+                </label>
+                <label class="param-switch">
+                  <span>自动卖出</span>
+                  <span class="toggle" :class="{ active: takeoverForm.enableAutoSell }" @click="takeoverForm.enableAutoSell = !takeoverForm.enableAutoSell"></span>
+                </label>
+              </div>
+              <div class="grid-2" style="margin-top:0.5rem">
+                <label class="param-switch">
+                  <span>硬止损</span>
+                  <span class="toggle" :class="{ active: takeoverForm.enableHardStop }" @click="takeoverForm.enableHardStop = !takeoverForm.enableHardStop"></span>
+                </label>
+                <label class="param-switch">
+                  <span>参数调优入口可见</span>
+                  <span class="badge badge-active">是</span>
+                </label>
+              </div>
+              <div style="margin-top:0.75rem;padding:0.75rem;border:1px solid rgba(30,173,111,0.18);border-radius:var(--tr-radius-sm);background:rgba(30,173,111,0.04);font-size:0.8125rem;color:var(--tr-muted);line-height:1.55">
+                后续自动加仓 / 自动卖出 / 硬止损会按新策略执行，历史成交保持不变。
+              </div>
+            </template>
+            <template v-else>
+              <div class="input-group">
+                <label>确认解绑</label>
+                <input class="input-field" v-model="unbindConfirmText" type="text" :placeholder="'输入 ' + (position?.vt_symbol || '标的代码') + ' 继续'" />
+              </div>
+            </template>
+            <div class="modal-actions">
+              <button class="btn btn-outline" @click="closeTakeoverModal">取消</button>
+              <button
+                v-if="takeoverMode === 'unbind'"
+                class="btn btn-danger"
+                data-testid="position-unbind-confirm-btn"
+                :disabled="unbindConfirmText !== position?.vt_symbol || takeoverSaving"
+                @click="unbindStrategy"
+              >
+                {{ takeoverSaving ? '解绑中...' : '确认解绑' }}
+              </button>
+              <button
+                v-else
+                class="btn btn-primary"
+                data-testid="position-bind-confirm-btn"
+                :disabled="!takeoverForm.templateId || takeoverSaving"
+                @click="bindStrategy"
+              >
+                {{ takeoverSaving ? '接管中...' : '确认接管' }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Strong Clear Confirm Modal -->
+        <div v-if="showClearConfirmModal" class="modal-overlay" @click.self="closeClearConfirm">
+          <div class="modal-content" style="max-width:520px">
+            <div class="modal-header">一键清仓（强确认）</div>
+            <div style="font-size:0.875rem;color:var(--tr-muted);line-height:1.6;margin-bottom:0.75rem">
+              清仓会卖出当前持仓及其可执行批次；请确认你理解，这不是修改历史成交，而是发起后续卖出指令。
+            </div>
+            <div style="padding:0.75rem;border:1px solid rgba(245,158,11,0.22);border-radius:var(--tr-radius-sm);background:rgba(245,158,11,0.06);color:var(--tr-warning);font-size:0.8125rem;line-height:1.55;margin-bottom:0.75rem">
+              为防误触，请输入 <strong>{{ position?.vt_symbol }}</strong> 后继续。
+            </div>
+            <div class="input-group">
+              <label>确认文本</label>
+              <input class="input-field" v-model="clearConfirmText" type="text" :placeholder="position?.vt_symbol || '输入标的代码'" />
+            </div>
+            <div class="modal-actions">
+              <button class="btn btn-outline" @click="closeClearConfirm">取消</button>
+              <button class="btn btn-danger" data-testid="position-clear-confirm-btn" :disabled="clearConfirmText !== position?.vt_symbol || clearingStock" @click="clearStock">
+                {{ clearingStock ? '清仓中...' : '确认清仓' }}
               </button>
             </div>
           </div>
@@ -581,7 +737,7 @@
 
 <script setup lang="ts">
 import { ref, computed, reactive, watch, onMounted } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { api, executionsApi, toast } from '../api/api-client';
 import type { ExecutionInfo, ExecutionPerformance, SettingsResponse } from '../api/api-client';
 import ExecutionSelector from '../components/ExecutionSelector.vue';
@@ -599,6 +755,7 @@ interface StrategyParams {
   enable_hard_stop?: boolean;
   add_price_type?: string;
   sell_price_type?: string;
+  base_price_strategy?: string;
 }
 
 interface TradeLot {
@@ -643,6 +800,7 @@ interface TlPosition {
 }
 
 const route = useRoute();
+const router = useRouter();
 const isTradeLotView = computed(() => route.path === '/tradelot');
 
 // ── TradeLot Batch View State ──
@@ -666,8 +824,8 @@ const tlExecError = reactive<Record<string, string>>({});
 const selectedTlExecIds = reactive<Record<string, string>>({});
 
 // Tune params modal
-const tlTuneModal = reactive<{ show: boolean; stock: TlPosition | null; loading: boolean; saving: boolean }>({
-  show: false, stock: null, loading: false, saving: false,
+const tlTuneModal = reactive<{ show: boolean; stock: TlPosition | null; executionId: string | null; loading: boolean; saving: boolean }>({
+  show: false, stock: null, executionId: null, loading: false, saving: false,
 });
 const tlTuneForm = reactive<StrategyParams>({});
 
@@ -719,7 +877,7 @@ async function loadTradeLotPositions() {
     const data = await api.get('/positions');
     tlPositions.value = Array.isArray(data) ? data : (data.items || []);
   } catch (e: any) {
-    tlError.value = e.message || 'Failed to load positions';
+    tlError.value = e.message || '加载持仓失败';
   }
   tlLoading.value = false;
 }
@@ -763,7 +921,7 @@ async function loadTradeLotExecutions(stockId: string) {
       selectedTlExecIds[stockId] = stockExecutionsForTradeLot[stockId][0].id;
     }
   } catch (e: any) {
-    tlExecError[stockId] = e.message || 'Failed to load executions';
+    tlExecError[stockId] = e.message || '加载执行失败';
   }
   tlExecLoading[stockId] = false;
 }
@@ -797,23 +955,26 @@ async function addExecForTradeLot() {
   try {
     await executionsApi.create({
       stock_id: tlAddExecModal.stock.id,
-      strategy_template_id: tlAddExecForm.templateId,
+      strategy_definition_id: tlAddExecForm.templateId,
+      parameters: {},
       name: tlAddExecForm.name || undefined,
+      position_id: tlAddExecModal.stock.strategy_instance_id,
     });
-    toast('Execution added');
+    toast('策略执行已添加');
     tlAddExecModal.show = false;
     if (tlAddExecModal.stock) {
       delete stockExecutionsForTradeLot[tlAddExecModal.stock.id];
       await loadTradeLotExecutions(tlAddExecModal.stock.id);
     }
   } catch (e: any) {
-    toast(e.message || 'Failed to add execution');
+    toast(e.message || '添加策略执行失败');
   }
   tlAddExecModal.saving = false;
 }
 
 async function openTuneParams(p: TlPosition) {
   tlTuneModal.stock = p;
+  tlTuneModal.executionId = p.strategy_instance_id || null;
   tlTuneModal.loading = true;
   tlTuneModal.show = true;
   // Reset form
@@ -826,8 +987,12 @@ async function openTuneParams(p: TlPosition) {
     hard_stop_loss_pct: undefined,
   });
   try {
-    if (p.strategy_instance_id) {
-      const instData = await api.get(`/strategies/instances/${p.strategy_instance_id}`);
+    if (!tlTuneModal.executionId) {
+      const detail = await api.get(`/positions/${p.id}`);
+      tlTuneModal.executionId = detail.strategy_instance_id || null;
+    }
+    if (tlTuneModal.executionId) {
+      const instData = await api.get(`/strategies/instances/${tlTuneModal.executionId}`);
       Object.assign(tlTuneForm, instData.params || {});
     }
   } catch {
@@ -840,35 +1005,33 @@ async function saveTuneParams() {
   if (!tlTuneModal.stock) return;
   tlTuneModal.saving = true;
   try {
-    const stock = tlTuneModal.stock;
-    const endpoint = stock.strategy_instance_id
-      ? `/strategies/instances/${stock.strategy_instance_id}`
-      : `/positions/${stock.id}/params`;
-    await api.put(endpoint, { params: { ...tlTuneForm } });
-    toast('Parameters saved');
+    const executionId = tlTuneModal.executionId;
+    if (!executionId) throw new Error('当前持仓未绑定策略执行');
+    await api.put(`/strategies/instances/${executionId}`, { params: { ...tlTuneForm } });
+    toast('参数已保存');
     tlTuneModal.show = false;
   } catch (e: any) {
-    toast(e.message || 'Failed to save parameters');
+    toast(e.message || '保存参数失败');
   }
   tlTuneModal.saving = false;
 }
 
 async function pauseStrategy(p: TlPosition) {
   try {
-    await api.post(`/strategies/instances/${p.strategy_instance_id}/pause`);
-    toast('Strategy paused');
+    await api.post(`/positions/${p.id}/pause`);
+    toast('策略已暂停');
   } catch (e: any) {
-    toast(e.message || 'Failed to pause strategy');
+    toast(e.message || '暂停策略失败');
   }
 }
 
-async function clearStock(p: TlPosition) {
+async function clearTradeLotPosition(p: TlPosition) {
   try {
     await api.post(`/positions/${p.id}/clear`);
-    toast('Clear stock order sent');
+    toast('清仓指令已发送');
     await loadTradeLotPositions();
   } catch (e: any) {
-    toast(e.message || 'Failed to clear stock');
+    toast(e.message || '清仓失败');
   }
 }
 
@@ -894,6 +1057,21 @@ const execSelectorError = ref('');
 const execPerformance = ref<ExecutionPerformance | null>(null);
 const execPerfLoading = ref(false);
 const execPerfError = ref('');
+const showTakeoverModal = ref(false);
+const takeoverMode = ref<'bind' | 'unbind'>('bind');
+const takeoverSaving = ref(false);
+const takeoverTemplates = ref<TemplateResult[]>([]);
+const unbindConfirmText = ref('');
+const showClearConfirmModal = ref(false);
+const clearConfirmText = ref('');
+const clearingStock = ref(false);
+const takeoverForm = reactive({
+  templateId: '',
+  basePriceStrategy: 'current',
+  enableAutoAdd: true,
+  enableAutoSell: true,
+  enableHardStop: true,
+});
 
 interface ExecutionParams {
   params: StrategyParams;
@@ -907,6 +1085,8 @@ const addExecInDetailTemplateId = ref('');
 const addExecInDetailName = ref('');
 const addExecInDetailTemplates = ref<TemplateResult[]>([]);
 const addingExecInDetail = ref(false);
+type PositionRouteAction = 'bind' | 'unbind' | 'pause' | 'stop-loss' | 'clear';
+const handledRouteActionSignature = ref('');
 
 const currentParams = computed<StrategyParams>(() => {
   if (enableMultiExecution.value && selectedExecutionId.value) {
@@ -916,15 +1096,46 @@ const currentParams = computed<StrategyParams>(() => {
   return strategyParams.value;
 });
 
+function resetPositionDetailState() {
+  handledRouteActionSignature.value = '';
+  selectedExecutionId.value = null;
+  allExecutions.value = [];
+  execPerformance.value = null;
+  execPerfError.value = '';
+  execPerfLoading.value = false;
+  execSelectorError.value = '';
+  execSelectorLoading.value = false;
+  strategyParams.value = {};
+  editingParams.value = false;
+  savingParams.value = false;
+  showTakeoverModal.value = false;
+  takeoverSaving.value = false;
+  unbindConfirmText.value = '';
+  showClearConfirmModal.value = false;
+  clearConfirmText.value = '';
+  clearingStock.value = false;
+  showAddExecInDetailModal.value = false;
+  addExecInDetailName.value = '';
+  addExecInDetailTemplateId.value = '';
+  addExecInDetailTemplates.value = [];
+  tradeLots.value = [];
+  lotsLoading.value = true;
+  error.value = '';
+  position.value = null;
+  for (const key of Object.keys(executionParamsCache)) {
+    delete executionParamsCache[key];
+  }
+}
+
 const sortKey = ref('batch_index');
 const sortAsc = ref(true);
 
 const sortableColumns = [
   { key: 'batch_index', label: '#' },
-  { key: 'entry_price', label: 'Price' },
-  { key: 'entry_time', label: 'Date' },
-  { key: 'status', label: 'Status' },
-  { key: 'pnl', label: 'P&L' },
+  { key: 'entry_price', label: '价格' },
+  { key: 'entry_time', label: '日期' },
+  { key: 'status', label: '状态' },
+  { key: 'pnl', label: '盈亏' },
 ];
 
 const sortedLots = computed(() => {
@@ -977,7 +1188,7 @@ async function saveParams() {
   savingParams.value = true;
   try {
     const endpoint = enableMultiExecution.value && selectedExecutionId.value
-      ? `/strategies/executions/${selectedExecutionId.value}/params`
+      ? `/strategies/instances/${selectedExecutionId.value}`
       : `/strategies/instances/${position.value.strategy_instance_id}`;
     await api.put(endpoint, { params: { ...editForm } });
 
@@ -990,9 +1201,9 @@ async function saveParams() {
       strategyParams.value = { ...editForm };
     }
     editingParams.value = false;
-    toast('Parameters saved');
+    toast('参数已保存');
   } catch (e: any) {
-    toast(e.message || 'Failed to save parameters');
+    toast(e.message || '保存参数失败');
   }
   savingParams.value = false;
 }
@@ -1006,6 +1217,174 @@ async function loadSettings() {
   }
 }
 
+function goToTradeWorkbench(side: 'buy' | 'sell') {
+  const symbol = position.value?.vt_symbol || position.value?.symbol || positionId.value || '';
+  router.push({ path: '/order', query: symbol ? { symbol, side } : { side } });
+}
+
+async function refreshDetail() {
+  await Promise.all([loadPosition(), loadExecutions()]);
+}
+
+function normalizeRouteAction(action: unknown): PositionRouteAction | '' {
+  if (typeof action !== 'string') return '';
+  const normalized = action.toLowerCase();
+  return ['bind', 'unbind', 'pause', 'stop-loss', 'clear'].includes(normalized)
+    ? (normalized as PositionRouteAction)
+    : '';
+}
+
+function resetPositionActionUi() {
+  showTakeoverModal.value = false;
+  showClearConfirmModal.value = false;
+  editingParams.value = false;
+}
+
+function autoActivateRouteAction(action: PositionRouteAction) {
+  resetPositionActionUi();
+
+  switch (action) {
+    case 'bind':
+      openTakeoverModal('bind');
+      break;
+    case 'unbind':
+      openTakeoverModal('unbind');
+      break;
+    case 'pause':
+      if (position.value?.status?.toLowerCase() !== 'paused') {
+        pauseCurrentStrategy();
+      }
+      break;
+    case 'stop-loss':
+      // No dedicated stop-loss modal exists here; reuse the inline parameter editor
+      // so hard_stop_loss_pct can be adjusted in place without introducing a new surface.
+      startEditParams();
+      break;
+    case 'clear':
+      openClearConfirm();
+      break;
+  }
+}
+
+function openTakeoverModal(mode: 'bind' | 'unbind') {
+  takeoverMode.value = mode;
+  takeoverSaving.value = false;
+  unbindConfirmText.value = '';
+  if (mode === 'bind') {
+    takeoverForm.templateId = '';
+    takeoverForm.basePriceStrategy = currentParams.value.base_price_strategy || 'current';
+    takeoverForm.enableAutoAdd = currentParams.value.enable_auto_add ?? true;
+    takeoverForm.enableAutoSell = currentParams.value.enable_auto_sell ?? true;
+    takeoverForm.enableHardStop = currentParams.value.enable_hard_stop ?? true;
+    if (takeoverTemplates.value.length === 0) {
+      loadTakeoverTemplates();
+    }
+  }
+  showTakeoverModal.value = true;
+}
+
+function closeTakeoverModal() {
+  showTakeoverModal.value = false;
+}
+
+async function loadTakeoverTemplates() {
+  try {
+    const data = await api.get('/strategies/templates');
+    takeoverTemplates.value = Array.isArray(data) ? data : [];
+  } catch {
+    takeoverTemplates.value = [];
+  }
+}
+
+async function bindStrategy() {
+  if (!positionId.value || !takeoverForm.templateId) return;
+  takeoverSaving.value = true;
+  try {
+    const created = await executionsApi.create({
+      stock_id: positionId.value,
+      strategy_definition_id: takeoverForm.templateId,
+      position_id: positionId.value,
+      parameters: {
+        base_price_strategy: takeoverForm.basePriceStrategy,
+        enable_auto_add: takeoverForm.enableAutoAdd,
+        enable_auto_sell: takeoverForm.enableAutoSell,
+        enable_hard_stop: takeoverForm.enableHardStop,
+      },
+      name: `${position.value?.vt_symbol || positionId.value} 接管`,
+    });
+    selectedExecutionId.value = created.id;
+    toast('策略已接管：历史成交不变，仅影响后续执行归属');
+    showTakeoverModal.value = false;
+    await Promise.all([loadExecutions(), loadPosition()]);
+  } catch (e: any) {
+    toast(e.message || '策略接管失败');
+  }
+  takeoverSaving.value = false;
+}
+
+async function unbindStrategy() {
+  if (!positionId.value) return;
+  const executionId = selectedExecutionId.value || position.value?.strategy_instance_id;
+  if (!executionId) return;
+  takeoverSaving.value = true;
+  try {
+    await executionsApi.remove(positionId.value, executionId);
+    toast('策略已解绑：历史成交不变，仅停止后续自动执行');
+    showTakeoverModal.value = false;
+    selectedExecutionId.value = null;
+    await Promise.all([loadExecutions(), loadPosition()]);
+  } catch (e: any) {
+    toast(e.message || '解绑失败');
+  }
+  takeoverSaving.value = false;
+}
+
+async function pauseCurrentStrategy() {
+  if (!positionId.value) return;
+  try {
+    await api.post(`/positions/${positionId.value}/pause`);
+    toast('策略已暂停');
+    await loadPosition();
+  } catch (e: any) {
+    toast(e.message || '暂停失败');
+  }
+}
+
+async function resumeCurrentStrategy() {
+  if (!positionId.value) return;
+  try {
+    await api.post(`/positions/${positionId.value}/resume`);
+    toast('策略已恢复');
+    await loadPosition();
+  } catch (e: any) {
+    toast(e.message || '恢复失败');
+  }
+}
+
+function openClearConfirm() {
+  clearConfirmText.value = '';
+  showClearConfirmModal.value = true;
+}
+
+function closeClearConfirm() {
+  showClearConfirmModal.value = false;
+}
+
+async function clearStock() {
+  if (!positionId.value) return;
+  if (clearConfirmText.value !== position.value?.vt_symbol) return;
+  clearingStock.value = true;
+  try {
+    await api.post(`/positions/${positionId.value}/clear`);
+    toast('清仓指令已发送');
+    showClearConfirmModal.value = false;
+    await refreshDetail();
+  } catch (e: any) {
+    toast(e.message || '清仓失败');
+  }
+  clearingStock.value = false;
+}
+
 async function loadExecutions() {
   if (!positionId.value) return;
   execSelectorLoading.value = true;
@@ -1017,7 +1396,7 @@ async function loadExecutions() {
       selectExecution(allExecutions.value[0].id);
     }
   } catch (e: any) {
-    execSelectorError.value = e.message || 'Failed to load executions';
+    execSelectorError.value = e.message || '加载执行失败';
     allExecutions.value = [];
   }
   execSelectorLoading.value = false;
@@ -1045,7 +1424,7 @@ async function loadExecPerformance(executionId: string) {
   try {
     execPerformance.value = await executionsApi.performance(executionId);
   } catch (e: any) {
-    execPerfError.value = e.message || 'Failed to load performance';
+    execPerfError.value = e.message || '加载表现数据失败';
     execPerformance.value = null;
   }
   execPerfLoading.value = false;
@@ -1075,14 +1454,16 @@ async function addExecInDetail() {
   try {
     await executionsApi.create({
       stock_id: positionId.value,
-      strategy_template_id: addExecInDetailTemplateId.value,
+      strategy_definition_id: addExecInDetailTemplateId.value,
+      parameters: {},
       name: addExecInDetailName.value || undefined,
+      position_id: position.value?.strategy_instance_id || positionId.value,
     });
-    toast('Execution added');
+    toast('策略执行已添加');
     showAddExecInDetailModal.value = false;
     await loadExecutions();
   } catch (e: any) {
-    toast(e.message || 'Failed to add execution');
+    toast(e.message || '添加策略执行失败');
   }
   addingExecInDetail.value = false;
 }
@@ -1105,10 +1486,36 @@ async function loadPosition() {
       }
     }
   } catch (e: any) {
-    error.value = e.message || 'Failed to load position';
+    error.value = e.message || '加载持仓失败';
   }
   loading.value = false;
 }
+
+watch(
+  [() => normalizeRouteAction(route.query.action), () => loading.value, () => positionId.value],
+  ([action]) => {
+    if (!action || isTradeLotView.value || !positionId.value) return;
+    const signature = `${positionId.value}:${action}`;
+    if (handledRouteActionSignature.value === signature) return;
+    if (loading.value || !position.value) return;
+
+    handledRouteActionSignature.value = signature;
+    autoActivateRouteAction(action);
+  },
+  { immediate: true },
+);
+
+watch(positionId, async (nextId, prevId) => {
+  if (!nextId || nextId === prevId) return;
+  resetPositionDetailState();
+  if (!isTradeLotView.value) {
+    await loadPosition();
+    await loadTakeoverTemplates();
+    if (enableMultiExecution.value) {
+      await loadExecutions();
+    }
+  }
+});
 
 onMounted(() => {
   loadSettings();
@@ -1116,6 +1523,7 @@ onMounted(() => {
     loadTradeLotPositions();
   } else if (positionId.value) {
     loadPosition();
+    loadTakeoverTemplates();
   }
 });
 

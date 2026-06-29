@@ -8,19 +8,19 @@
         </svg>
         <span style="font-size:1.25rem;font-weight:700;color:var(--tr-text)">策略模板库</span>
       </div>
-      <button class="btn btn-primary" @click="openCreateModal">
+      <button class="btn btn-primary" data-testid="strategy-create-btn" @click="openCreateModal">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:0.375rem"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         新建策略模板
       </button>
     </div>
 
     <!-- Loading -->
-    <div v-if="loading" class="card" style="text-align:center;padding:2rem;color:var(--tr-muted)">Loading templates...</div>
+    <div v-if="loading" class="card" style="text-align:center;padding:2rem;color:var(--tr-muted)">加载中...</div>
 
     <!-- Error -->
     <div v-else-if="error" class="card" style="text-align:center;padding:2rem">
       <div style="color:var(--tr-up);margin-bottom:0.75rem">{{ error }}</div>
-      <button class="btn btn-primary" @click="loadTemplates">Retry</button>
+      <button class="btn btn-primary" @click="loadTemplates">重试</button>
     </div>
 
     <!-- Template Grid -->
@@ -30,6 +30,7 @@
         :key="t.id"
         class="card strategy-card"
         :class="{ 'strategy-card-builtin': t.is_system }"
+        data-testid="strategy-card"
       >
         <!-- Built-in badge -->
         <span v-if="t.is_system" class="strategy-builtin-badge">内置默认</span>
@@ -45,7 +46,7 @@
           <div style="flex:1;min-width:0">
             <div style="font-weight:600;color:var(--tr-text);font-size:0.9375rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ t.name }}</div>
             <div style="font-size:0.8125rem;color:var(--tr-muted);margin-top:0.125rem">
-              {{ t.description || 'No description' }}
+              {{ t.description || '暂无描述' }}
             </div>
           </div>
         </div>
@@ -53,32 +54,36 @@
         <!-- Parameter rows -->
         <div class="strategy-params">
           <div class="strategy-param-row">
-            <span class="strategy-param-label">底仓</span>
-            <span class="strategy-param-value">&yen;{{ (t.params?.base_position_amount || 0).toLocaleString() }}</span>
+            <span class="strategy-param-label">底仓股数</span>
+            <span class="strategy-param-value">{{ t.params?.base_position_shares ? t.params.base_position_shares + ' 股' : '未设' }}</span>
           </div>
           <div class="strategy-param-row">
-            <span class="strategy-param-label">补仓条件</span>
+            <span class="strategy-param-label">补仓触发（跌幅）</span>
             <span class="strategy-param-value text-down">{{ t.params?.add_trigger_pct ?? '--' }}%</span>
           </div>
           <div class="strategy-param-row">
-            <span class="strategy-param-label">止盈条件</span>
+            <span class="strategy-param-label">补仓股数</span>
+            <span class="strategy-param-value">{{ t.params?.add_position_shares ? t.params.add_position_shares + ' 股' : '未设' }}</span>
+          </div>
+          <div class="strategy-param-row">
+            <span class="strategy-param-label">止盈触发（涨幅）</span>
             <span class="strategy-param-value text-up">{{ t.params?.sell_trigger_pct ?? '--' }}%</span>
           </div>
           <div class="strategy-param-row">
-            <span class="strategy-param-label">最大次数</span>
+            <span class="strategy-param-label">最大补仓次数</span>
             <span class="strategy-param-value">{{ t.params?.max_add_count ?? '--' }}</span>
           </div>
           <div class="strategy-param-row">
-            <span class="strategy-param-label">硬止损</span>
+            <span class="strategy-param-label">硬止损（跌幅）</span>
             <span class="strategy-param-value text-up">{{ t.params?.hard_stop_loss_pct ?? '--' }}%</span>
           </div>
         </div>
 
         <!-- Action buttons -->
         <div style="display:flex;gap:0.375rem;margin-top:0.75rem">
-          <button class="btn btn-sm btn-outline" style="flex:1" @click="openEditModal(t)">编辑</button>
+          <button class="btn btn-sm btn-outline" style="flex:1" data-testid="strategy-edit-btn" @click="openEditModal(t)">编辑</button>
           <button class="btn btn-sm btn-outline" style="flex:1" @click="cloneTemplate(t)">克隆</button>
-          <button v-if="!t.is_system" class="btn btn-sm btn-danger" style="flex:0" @click="confirmDelete(t)">
+          <button v-if="!t.is_system" class="btn btn-sm btn-danger" style="flex:0" data-testid="strategy-delete-btn" @click="confirmDelete(t)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
           </button>
         </div>
@@ -86,7 +91,7 @@
 
       <!-- Empty state -->
       <div v-if="templates.length === 0 && !loading" class="card" style="text-align:center;padding:2rem;color:var(--tr-muted);grid-column:1/-1">
-        No strategy templates. Click "新建策略模板" to create one.
+        暂无策略模板，点击"新建策略模板"创建
       </div>
     </div>
 
@@ -96,70 +101,90 @@
         <div class="modal-header">{{ editingTemplate ? '编辑策略模板' : '新建策略模板' }}</div>
 
         <div class="input-group">
-          <label>Name</label>
-          <input class="input-field" v-model="formData.name" type="text" placeholder="e.g. Aggressive Grid" />
+          <label>名称</label>
+          <input class="input-field" v-model="formData.name" type="text" placeholder="例如：激进网格" />
         </div>
         <div class="input-group">
-          <label>Description</label>
-          <input class="input-field" v-model="formData.description" type="text" placeholder="Brief description..." />
+          <label>描述</label>
+          <input class="input-field" v-model="formData.description" type="text" placeholder="简要描述..." />
         </div>
 
         <div class="param-group">
-          <div class="param-group-label">Entry</div>
+          <div class="param-group-label">建仓参数</div>
+          <div class="param-hint">底仓股数为首次建仓的股票数量；补仓股数为每次补仓的数量</div>
           <div class="row">
             <div class="input-group" style="flex:1">
-              <label>Base Amount (&yen;)</label>
-              <input class="input-field" v-model.number="formData.base_position_amount" type="number" step="10000" />
+              <label>底仓股数</label>
+              <input class="input-field" v-model.number="formData.base_position_shares" type="number" step="100" min="100" placeholder="如 1000" />
             </div>
             <div class="input-group" style="flex:1">
-              <label>Add Amount (&yen;)</label>
-              <input class="input-field" v-model.number="formData.add_position_amount" type="number" step="10000" />
+              <label>补仓股数</label>
+              <input class="input-field" v-model.number="formData.add_position_shares" type="number" step="100" min="100" placeholder="如 500" />
+              <div class="param-hint" v-if="formData.add_position_shares && formData.add_position_shares > 0">每次补仓 {{ formData.add_position_shares }} 股</div>
             </div>
           </div>
         </div>
 
         <div class="param-group">
-          <div class="param-group-label">Position</div>
+          <div class="param-group-label">仓位参数</div>
           <div class="row">
             <div class="input-group" style="flex:1">
-              <label>Max Add Count</label>
+              <label>最大补仓次数</label>
               <input class="input-field" v-model.number="formData.max_add_count" type="number" min="1" max="20" />
             </div>
             <div class="input-group" style="flex:1">
-              <label>Max Position Amt (&yen;)</label>
+              <label>单票容量上限 (&yen;)</label>
               <input class="input-field" v-model.number="formData.max_position_amount" type="number" step="10000" />
             </div>
           </div>
         </div>
 
         <div class="param-group">
-          <div class="param-group-label">Exit</div>
+          <div class="param-group-label">离场参数</div>
           <div class="row">
             <div class="input-group" style="flex:1">
-              <label>Add Trigger (%)</label>
-              <input class="input-field" v-model.number="formData.add_trigger_pct" type="number" step="0.1" />
+              <label>补仓触发（跌幅%，须为负）</label>
+              <input class="input-field" v-model.number="formData.add_trigger_pct" type="number" step="0.1" placeholder="如 -2" />
+              <div class="param-hint" :class="{ 'param-hint--error': formData.add_trigger_pct != null && formData.add_trigger_pct >= 0 }">价格下跌到此幅度时自动补仓（如 -2 = 跌2%补仓）</div>
             </div>
             <div class="input-group" style="flex:1">
-              <label>Sell Trigger (%)</label>
-              <input class="input-field" v-model.number="formData.sell_trigger_pct" type="number" step="0.1" />
+              <label>止盈触发（涨幅%，须为正）</label>
+              <input class="input-field" v-model.number="formData.sell_trigger_pct" type="number" step="0.1" placeholder="如 3" />
+              <div class="param-hint" :class="{ 'param-hint--error': formData.sell_trigger_pct != null && formData.sell_trigger_pct <= 0 }">补仓批次盈利到此幅度卖出该批；底仓不自动止盈（如 3 = 涨3%卖该批）</div>
             </div>
           </div>
         </div>
 
         <div class="param-group">
-          <div class="param-group-label">Risk</div>
-          <div class="row">
+          <div class="param-group-label">风控开关</div>
+          <div class="checkbox-group">
+            <label class="checkbox-label">
+              <input type="checkbox" v-model="formData.enable_auto_add" />
+              <span>启用自动补仓</span>
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" v-model="formData.enable_auto_sell" />
+              <span>启用自动止盈</span>
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" v-model="formData.enable_hard_stop" />
+              <span>启用硬止损（默认关闭）</span>
+            </label>
+          </div>
+          <div class="param-hint">硬止损默认关闭，须主动勾选。启用后底仓价跌到止损线将全部清仓（含底仓+补仓）。</div>
+          <div class="row" v-if="formData.enable_hard_stop">
             <div class="input-group" style="flex:1">
-              <label>Hard Stop Loss (%)</label>
-              <input class="input-field" v-model.number="formData.hard_stop_loss_pct" type="number" step="0.1" />
+              <label>硬止损（跌幅%，须为负）</label>
+              <input class="input-field" v-model.number="formData.hard_stop_loss_pct" type="number" step="0.1" placeholder="如 -8" />
+              <div class="param-hint" :class="{ 'param-hint--error': formData.hard_stop_loss_pct != null && formData.hard_stop_loss_pct >= 0 }">底仓价下跌到此幅度全部清仓（含底仓+补仓），停止监控（如 -8 = 跌8%清仓）</div>
             </div>
           </div>
         </div>
 
         <div class="modal-actions">
-          <button class="btn btn-outline" @click="closeFormModal">Cancel</button>
+          <button class="btn btn-outline" @click="closeFormModal">取消</button>
           <button class="btn btn-primary" :disabled="!formData.name || saving" @click="submitForm">
-            {{ saving ? 'Saving...' : (editingTemplate ? 'Update' : 'Create') }}
+            {{ saving ? '保存中...' : (editingTemplate ? '更新' : '创建') }}
           </button>
         </div>
       </div>
@@ -170,12 +195,12 @@
       <div class="modal-content" style="max-width:400px">
         <div class="modal-header">确认删除</div>
         <p style="color:var(--tr-muted);margin-bottom:1rem">
-          Delete strategy template "{{ deleteTarget?.name }}"?
+          确认删除策略模板 "{{ deleteTarget?.name }}"？
         </p>
         <div class="modal-actions">
-          <button class="btn btn-outline" @click="showDeleteModal = false">Cancel</button>
-          <button class="btn btn-danger" :disabled="deleting" @click="deleteTemplate">
-            {{ deleting ? 'Deleting...' : 'Delete' }}
+          <button class="btn btn-outline" @click="showDeleteModal = false">取消</button>
+          <button class="btn btn-danger" data-testid="strategy-confirm-delete" :disabled="deleting" @click="deleteTemplate">
+            {{ deleting ? '删除中...' : '确认删除' }}
           </button>
         </div>
       </div>
@@ -199,12 +224,17 @@ interface TemplateFormData {
   name: string;
   description: string;
   base_position_amount: number | undefined;
+  base_position_shares: number | undefined;
   add_position_amount: number | undefined;
+  add_position_shares: number | undefined;
   add_trigger_pct: number | undefined;
   sell_trigger_pct: number | undefined;
   max_add_count: number | undefined;
   max_position_amount: number | undefined;
   hard_stop_loss_pct: number | undefined;
+  enable_auto_add: boolean;
+  enable_auto_sell: boolean;
+  enable_hard_stop: boolean;
 }
 
 const loading = ref(true);
@@ -219,12 +249,17 @@ const formData = reactive<TemplateFormData>({
   name: '',
   description: '',
   base_position_amount: undefined,
+  base_position_shares: undefined,
   add_position_amount: undefined,
+  add_position_shares: undefined,
   add_trigger_pct: undefined,
   sell_trigger_pct: undefined,
   max_add_count: undefined,
   max_position_amount: undefined,
   hard_stop_loss_pct: undefined,
+  enable_auto_add: true,
+  enable_auto_sell: true,
+  enable_hard_stop: false,
 });
 
 // Delete modal
@@ -236,10 +271,10 @@ async function loadTemplates() {
   loading.value = true;
   error.value = '';
   try {
-    const data = await api.get('/strategy-definitions');
+    const data = await api.get('/strategies/definitions');
     templates.value = Array.isArray(data) ? data : (data.items || []);
   } catch (e: any) {
-    error.value = e.message || 'Failed to load templates';
+    error.value = e.message || '加载失败';
   }
   loading.value = false;
 }
@@ -248,12 +283,17 @@ function resetForm() {
   formData.name = '';
   formData.description = '';
   formData.base_position_amount = undefined;
+  formData.base_position_shares = undefined;
   formData.add_position_amount = undefined;
+  formData.add_position_shares = undefined;
   formData.add_trigger_pct = undefined;
   formData.sell_trigger_pct = undefined;
   formData.max_add_count = undefined;
   formData.max_position_amount = undefined;
   formData.hard_stop_loss_pct = undefined;
+  formData.enable_auto_add = true;
+  formData.enable_auto_sell = true;
+  formData.enable_hard_stop = false;
 }
 
 function openCreateModal() {
@@ -267,12 +307,17 @@ function openEditModal(t: StrategyTemplate) {
   formData.name = t.name;
   formData.description = t.description || '';
   formData.base_position_amount = t.params?.base_position_amount;
+  formData.base_position_shares = t.params?.base_position_shares;
   formData.add_position_amount = t.params?.add_position_amount;
+  formData.add_position_shares = t.params?.add_position_shares;
   formData.add_trigger_pct = t.params?.add_trigger_pct;
   formData.sell_trigger_pct = t.params?.sell_trigger_pct;
   formData.max_add_count = t.params?.max_add_count;
   formData.max_position_amount = t.params?.max_position_amount;
   formData.hard_stop_loss_pct = t.params?.hard_stop_loss_pct;
+  formData.enable_auto_add = t.params?.enable_auto_add ?? true;
+  formData.enable_auto_sell = t.params?.enable_auto_sell ?? true;
+  formData.enable_hard_stop = t.params?.enable_hard_stop ?? false;
   showFormModal.value = true;
 }
 
@@ -284,12 +329,17 @@ function closeFormModal() {
 function buildParams(): Record<string, any> {
   const p: Record<string, any> = {};
   if (formData.base_position_amount != null) p.base_position_amount = formData.base_position_amount;
+  if (formData.base_position_shares != null) p.base_position_shares = formData.base_position_shares;
   if (formData.add_position_amount != null) p.add_position_amount = formData.add_position_amount;
+  if (formData.add_position_shares != null) p.add_position_shares = formData.add_position_shares;
   if (formData.add_trigger_pct != null) p.add_trigger_pct = formData.add_trigger_pct;
   if (formData.sell_trigger_pct != null) p.sell_trigger_pct = formData.sell_trigger_pct;
   if (formData.max_add_count != null) p.max_add_count = formData.max_add_count;
   if (formData.max_position_amount != null) p.max_position_amount = formData.max_position_amount;
   if (formData.hard_stop_loss_pct != null) p.hard_stop_loss_pct = formData.hard_stop_loss_pct;
+  p.enable_auto_add = formData.enable_auto_add;
+  p.enable_auto_sell = formData.enable_auto_sell;
+  p.enable_hard_stop = formData.enable_hard_stop;
   return p;
 }
 
@@ -299,40 +349,40 @@ async function submitForm() {
   try {
     const params = buildParams();
     if (editingTemplate.value) {
-      await api.put(`/strategy-definitions/${editingTemplate.value.id}`, {
+      await api.put(`/strategies/definitions/${editingTemplate.value.id}`, {
         name: formData.name,
         description: formData.description || null,
         params,
       });
-      toast('Template updated');
+      toast('模板已更新');
     } else {
-      await api.post('/strategy-definitions', {
+      await api.post('/strategies/definitions', {
         name: formData.name,
         description: formData.description || null,
         params,
       });
-      toast('Template created');
+      toast('模板已创建');
     }
     showFormModal.value = false;
     editingTemplate.value = null;
     await loadTemplates();
   } catch (e: any) {
-    toast(e.message || 'Failed to save template');
+    toast(e.message || '保存失败');
   }
   saving.value = false;
 }
 
 async function cloneTemplate(t: StrategyTemplate) {
   try {
-    await api.post('/strategy-definitions', {
+    await api.post('/strategies/definitions', {
       name: `${t.name} (Copy)`,
       description: t.description,
       params: { ...t.params },
     });
-    toast('Template cloned');
+    toast('模板已克隆');
     await loadTemplates();
   } catch (e: any) {
-    toast(e.message || 'Failed to clone template');
+    toast(e.message || '克隆失败');
   }
 }
 
@@ -345,13 +395,13 @@ async function deleteTemplate() {
   if (!deleteTarget.value) return;
   deleting.value = true;
   try {
-    await api.delete(`/strategy-definitions/${deleteTarget.value.id}`);
-    toast('Template deleted');
+    await api.delete(`/strategies/definitions/${deleteTarget.value.id}`);
+    toast('模板已删除');
     showDeleteModal.value = false;
     deleteTarget.value = null;
     await loadTemplates();
   } catch (e: any) {
-    toast(e.message || 'Failed to delete template');
+    toast(e.message || '删除失败');
   }
   deleting.value = false;
 }
@@ -429,4 +479,9 @@ onMounted(() => {
   margin-bottom: 0.5rem;
   letter-spacing: 0.5px;
 }
+.param-hint { font-size: 0.75rem; color: var(--tr-muted, #888); margin-top: 0.25rem; }
+.param-hint--error { color: #ef4444; font-weight: 600; }
+.checkbox-group { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+.checkbox-label { display: flex; align-items: center; gap: 0.4rem; cursor: pointer; font-size: 0.9rem; }
+.checkbox-label input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
 </style>
