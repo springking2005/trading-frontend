@@ -379,7 +379,7 @@
 
             <div v-if="openOrders.length" class="table-list" data-testid="order-open-orders">
               <div class="table-head">
-                <span>委托时间</span><span>证券</span><span>方向</span><span>委托价</span><span>委托量</span><span>已成量</span><span>状态</span>
+                <span>委托时间</span><span>证券</span><span>方向</span><span>委托价</span><span>委托量</span><span>已成量</span><span>状态</span><span>操作</span>
               </div>
               <div v-for="order in openOrders" :key="order.id" class="table-row">
                 <span>{{ order.time }}</span>
@@ -389,13 +389,19 @@
                 <span>{{ order.qty }} 股</span>
                 <span>{{ order.filled }} 股</span>
                 <span><span class="badge badge-warning">{{ order.status }}</span></span>
+                <span>
+                  <button v-if="isModifiableStatus(order.status)" class="btn btn-outline btn-sm" @click="openModifyModal(order)" style="margin-right:0.4rem">修改</button>
+                  <button class="btn btn-danger btn-sm" @click="cancelOrder(order.id)" :disabled="cancellingId === order.id">
+                    {{ cancellingId === order.id ? '...' : '撤单' }}
+                  </button>
+                </span>
               </div>
               <div class="action-footer">
-                <span class="text-muted">支持单笔撤单；批量/全部可撤为后续接入点。</span>
-                <button class="btn btn-outline">批量撤单（待接入）</button>
+                <span class="text-muted">可撤状态：SUBMITTING / NOTTRADED / PARTTRADED</span>
+                <button class="btn btn-outline btn-sm" @click="loadOpenOrders">刷新</button>
               </div>
             </div>
-            <div v-else class="empty-state">
+            <div v-else-if="!ordersLoading" class="empty-state">
               <strong>暂无可撤委托</strong>
               <p class="text-muted">当前没有未成交的委托单。</p>
             </div>
@@ -463,18 +469,39 @@
             </div>
 
             <div v-if="activeQuerySection === 'overview'">
-              <div class="query-grid" data-testid="order-query-grid">
-                <div v-for="section in querySections" :key="section.title" class="query-section">
-                  <div class="query-section__head">
-                    <strong>{{ section.title }}</strong>
-                    <span class="badge" :class="section.readonly ? 'badge-warning' : 'badge-muted'">{{ section.state }}</span>
-                  </div>
-                  <p class="text-muted">{{ section.description }}</p>
+              <!-- Query sub-tabs -->
+              <div class="quick-actions" style="margin-bottom:1rem">
+                <button class="btn btn-sm" :class="querySubTab === 'todayOrders' ? 'btn-primary' : 'btn-outline'" @click="querySubTab = 'todayOrders'; loadQueryOrders()">当日委托</button>
+                <button class="btn btn-sm" :class="querySubTab === 'historyOrders' ? 'btn-primary' : 'btn-outline'" @click="querySubTab = 'historyOrders'; loadQueryOrders()">历史委托</button>
+                <button class="btn btn-sm" :class="querySubTab === 'todayTrades' ? 'btn-primary' : 'btn-outline'" @click="querySubTab = 'todayTrades'; loadQueryOrders()">当日成交</button>
+                <button class="btn btn-sm" :class="querySubTab === 'historyTrades' ? 'btn-primary' : 'btn-outline'" @click="querySubTab = 'historyTrades'; loadQueryOrders()">历史成交</button>
+                <button class="btn btn-outline btn-sm" @click="syncFutuOrders" :disabled="syncingFutu">{{ syncingFutu ? '同步中...' : '从 Futu 同步' }}</button>
+              </div>
+
+              <div v-if="queryLoading" class="text-muted" style="text-align:center;padding:2rem">加载中...</div>
+              <div v-else-if="queryOrders.length" class="table-list" data-testid="order-query-list">
+                <div class="table-head">
+                  <span>时间</span><span>证券</span><span>方向</span><span>委托价</span><span>委托量</span><span>已成量</span><span>状态</span><span>操作</span>
+                </div>
+                <div v-for="o in queryOrders" :key="o.id" class="table-row">
+                  <span>{{ o.time || '--' }}</span>
+                  <span>{{ o.code }} {{ o.name || '' }}</span>
+                  <span>{{ o.side }}</span>
+                  <span>{{ formatMoney(o.price) }}</span>
+                  <span>{{ o.qty }} 股</span>
+                  <span>{{ o.filled }} 股</span>
+                  <span><span class="badge" :class="o.status === 'ALLTRADED' ? '' : 'badge-warning'">{{ o.status }}</span></span>
+                  <span>
+                    <button v-if="isModifiableStatus(o.status)" class="btn btn-outline btn-sm" @click="openModifyModal(o)" style="margin-right:0.4rem">修改</button>
+                    <button v-if="isOpenOrderStatus(o.status)" class="btn btn-danger btn-sm" @click="cancelOrder(o.id)" :disabled="cancellingId === o.id">
+                      {{ cancellingId === o.id ? '...' : '撤单' }}
+                    </button>
+                  </span>
                 </div>
               </div>
-              <div class="empty-state">
-                <strong>查询面板可读</strong>
-                <p class="text-muted">本页先提供入口、字段和状态归位，后续对接真实明细。</p>
+              <div v-else-if="!queryLoading" class="empty-state">
+                <strong>{{ querySubTabLabel }}为空</strong>
+                <p class="text-muted">暂无符合条件的记录。</p>
               </div>
             </div>
 
@@ -672,6 +699,24 @@
         </div>
       </aside>
     </div>
+
+    <div v-if="showModifyModal" class="modal-overlay" @click="closeModifyModal">
+      <div class="modal-content" @click.stop>
+        <h3>修改订单</h3>
+        <div class="form-group">
+          <label>当前价格</label>
+          <input v-model.number="modifyForm.price" type="number" step="0.01" min="0.01" />
+        </div>
+        <div class="form-group">
+          <label>当前数量（股）</label>
+          <input v-model.number="modifyForm.volume" type="number" step="100" min="100" />
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-outline" @click="closeModifyModal">取消</button>
+          <button class="btn btn-primary" @click="submitModify">确认修改</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -790,6 +835,14 @@ const buySharesInput = ref('');
 const sellSharesInput = ref('');
 const selectedPositionId = ref('');
 const openOrders = ref<OrderRow[]>([]);
+const ordersLoading = ref(false);
+const cancellingId = ref('');
+const showModifyModal = ref(false);
+const modifyForm = ref({
+  orderId: '',
+  price: 0,
+  volume: 0,
+});
 const positions = ref<PositionRow[]>([]);
 const dashboardSnapshot = ref<DashboardSnapshot | null>(null);
 const accountRows = ref<AccountRow[]>([]);
@@ -857,14 +910,50 @@ const sellPresets = computed(() => recommendSellQuantities(sellableQty.value, tr
   key: preset.key,
 })));
 
-const querySections = [
-  { title: '当日委托', state: '已归位', readonly: true, description: '委托时间、证券、方向、委托价、委托量、已成量、状态。' },
-  { title: '当日成交', state: '已归位', readonly: true, description: '成交时间、证券、成交价、成交量、手续费、来源。' },
-  { title: '历史委托', state: '待接入', readonly: true, description: '历史委托记录可追溯，不伪装为实时执行。' },
-  { title: '历史成交', state: '待接入', readonly: true, description: '历史成交查询入口可见，后续接入真实明细。' },
-  { title: '已清仓股票', state: '已归位', readonly: true, description: '已清仓股票列表与复盘入口。' },
-  { title: '对账单 / 转账 / T / 新股 / 资产分析', state: '待接入', readonly: true, description: 'P2 能力仅保留入口或只读边界。' },
-];
+// ── Query tab state ──
+const querySubTab = ref<'todayOrders' | 'historyOrders' | 'todayTrades' | 'historyTrades'>('todayOrders');
+const queryLoading = ref(false);
+const queryOrders = ref<any[]>([]);
+
+const querySubTabLabel = computed(() => ({
+  todayOrders: '当日委托', historyOrders: '历史委托',
+  todayTrades: '当日成交', historyTrades: '历史成交',
+}[querySubTab.value]));
+
+async function loadQueryOrders() {
+  queryLoading.value = true;
+  try {
+    const params = new URLSearchParams();
+    if (querySubTab.value === 'todayOrders') {
+      params.set('statuses', 'SUBMITTING,NOTTRADED,PARTTRADED');
+      params.set('today', 'true');
+      params.set('limit', '200');
+    } else if (querySubTab.value === 'historyOrders') {
+      params.set('limit', '200');
+    } else if (querySubTab.value === 'todayTrades') {
+      params.set('statuses', 'ALLTRADED');
+      params.set('today', 'true');
+      params.set('limit', '200');
+    } else {
+      params.set('statuses', 'ALLTRADED');
+      params.set('limit', '200');
+    }
+    const data = await api.get(`/orders?${params.toString()}`);
+    const items = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
+    queryOrders.value = items.map((item: any) => ({
+      id: item.id || '',
+      time: item.created_at ? new Date(item.created_at).toLocaleString() : '--',
+      code: (item.vt_symbol || '').split('.')[0] || item.vt_symbol || '--',
+      name: item.stock_name || '',
+      side: item.direction === 'LONG' ? '买入' : '卖出',
+      price: Number(item.price ?? 0),
+      qty: Number(item.volume ?? 0),
+      filled: Number(item.traded_volume ?? 0),
+      status: item.status || '--',
+    }));
+  } catch { queryOrders.value = []; }
+  queryLoading.value = false;
+}
 
 const presetPriceStrategyOptions = [
   { value: 'LIMIT', label: '限价' },
@@ -1196,6 +1285,63 @@ async function loadPresetOrders() {
     presetOrders.value = normalizeList<any>(data).map(normalizePresetOrder);
   } catch {
     presetOrders.value = [];
+  }
+}
+
+function loadOpenOrders() { loadWorkbenchData(); }
+
+const syncingFutu = ref(false);
+async function syncFutuOrders() {
+  syncingFutu.value = true;
+  try {
+    const data = await api.get('/orders/futu/sync');
+    toast(`Futu 同步完成: ${data.synced_orders} 订单, ${data.synced_deals} 成交`);
+    await loadQueryOrders();
+  } catch (e: any) { toast(e?.message || '同步失败'); }
+  syncingFutu.value = false;
+}
+
+async function cancelOrder(orderId: string) {
+  cancellingId.value = orderId;
+  try {
+    await api.delete(`/orders/${orderId}`);
+    toast('委托已撤销');
+    await loadWorkbenchData();
+  } catch (e: any) {
+    toast(e?.message || '撤单失败');
+  }
+  cancellingId.value = '';
+}
+
+function isModifiableStatus(status: string): boolean {
+  const s = status.trim().toUpperCase();
+  return s === 'NOTTRADED' || s === 'PARTTRADED';
+}
+
+function openModifyModal(order: any) {
+  modifyForm.value = {
+    orderId: order.id,
+    price: order.price || 0,
+    volume: order.qty || order.volume || 100,
+  };
+  showModifyModal.value = true;
+}
+
+function closeModifyModal() {
+  showModifyModal.value = false;
+}
+
+async function submitModify() {
+  try {
+    const body: any = {};
+    if (modifyForm.value.price > 0) body.price = modifyForm.value.price;
+    if (modifyForm.value.volume > 0) body.volume = modifyForm.value.volume;
+    await api.patch(`/orders/${modifyForm.value.orderId}`, body);
+    toast('订单修改成功');
+    closeModifyModal();
+    await loadWorkbenchData();
+  } catch (e: any) {
+    toast(e?.message || '修改失败');
   }
 }
 
@@ -2162,5 +2308,56 @@ watch(
     flex-direction: column;
     align-items: stretch;
   }
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal-content {
+  background: var(--tr-panel, #1a1d28);
+  border: 1px solid var(--tr-border, #2d3148);
+  border-radius: var(--tr-radius, 8px);
+  padding: 1.5rem;
+  min-width: 360px;
+  max-width: 480px;
+}
+
+.modal-content h3 {
+  margin: 0 0 1rem;
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: var(--tr-muted, #8b90a0);
+  font-size: 0.85rem;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--tr-border, #2d3148);
+  border-radius: var(--tr-radius-sm, 4px);
+  background: var(--tr-bg, #11141e);
+  color: var(--tr-text, #e0e2ec);
+  font-size: 0.95rem;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
 }
 </style>
