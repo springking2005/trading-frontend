@@ -925,7 +925,8 @@ async function loadQueryOrders() {
   try {
     const params = new URLSearchParams();
     if (querySubTab.value === 'todayOrders') {
-      params.set('statuses', 'SUBMITTING,NOTTRADED,PARTTRADED');
+      // 当日委托 = 今日所有委托状态（含已成/已撤/废单）。
+      // 可撤未成单由“撤单”标签负责过滤 open statuses。
       params.set('today', 'true');
       params.set('limit', '200');
     } else if (querySubTab.value === 'historyOrders') {
@@ -1764,6 +1765,7 @@ async function submitBuy() {
     await api.post('/orders', payload);
     toast('买入订单已提交');
     buySharesInput.value = '';
+    await loadWorkbenchData();
   } catch (error: any) {
     toast(error?.message || '买入失败');
   }
@@ -1783,6 +1785,7 @@ async function submitSell() {
     });
     toast('卖出订单已提交');
     sellSharesInput.value = '';
+    await loadWorkbenchData();
   } catch (error: any) {
     toast(error?.message || '卖出失败');
   }
@@ -1885,6 +1888,19 @@ watch(
   () => {
     if (activeTab.value === 'sell' && selectedPositionId.value) {
       syncSellFromPosition();
+    }
+  },
+);
+
+watch(
+  () => activeTab.value,
+  (tab) => {
+    if (tab === 'query') {
+      void loadQueryOrders();
+      return;
+    }
+    if (tab === 'positions' || tab === 'cancel' || tab === 'sell') {
+      void loadWorkbenchData();
     }
   },
 );
